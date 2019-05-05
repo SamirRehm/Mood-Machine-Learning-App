@@ -2,8 +2,6 @@ package com.example.srehm.moodappui;
 
 import android.content.Context;
 import android.content.Intent;
-import android.os.Build;
-import android.os.storage.StorageManager;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -20,52 +18,21 @@ import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 
-
-import java.io.BufferedReader;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.InputStreamReader;
 import java.util.Calendar;
 
 public class MainActivity extends AppCompatActivity {
 
     FirebaseStorage storage;
+    FirebaseModelInterpreter firebaseModelInterpreter;
+    FirebaseModelInputOutputOptions IOOptions;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         storage = FirebaseStorage.getInstance();
-
-        FirebaseModelDownloadConditions.Builder conditionsBuilder =
-                new FirebaseModelDownloadConditions.Builder().requireWifi();
-        FirebaseModelDownloadConditions conditions = conditionsBuilder.build();
-
-        FirebaseRemoteModel cloudSource = new FirebaseRemoteModel.Builder("model-predictor")
-                .enableModelUpdates(true)
-                .setInitialDownloadConditions(conditions)
-                .setUpdatesDownloadConditions(conditions)
-                .build();
-        FirebaseModelManager.getInstance().registerRemoteModel(cloudSource);
-
-        FirebaseModelOptions options = new FirebaseModelOptions.Builder()
-                .setRemoteModelName("model-predictor")
-                .build();
-        FirebaseModelInterpreter firebaseInterpreter = null;
-        try {
-            firebaseInterpreter = FirebaseModelInterpreter.getInstance(options);
-        } catch (FirebaseMLException e) {
-            e.printStackTrace();
-        }
-        FirebaseModelInputOutputOptions inputOutputOptions = null;
-        try {
-            inputOutputOptions =
-                    new FirebaseModelInputOutputOptions.Builder()
-                            .setInputFormat(0, FirebaseModelDataType.FLOAT32, new int[]{1, 1})
-                            .setOutputFormat(0, FirebaseModelDataType.FLOAT32, new int[]{1, 1})
-                            .build();
-        } catch (FirebaseMLException e) {
-            e.printStackTrace();
-        }
+        set_up_firebase_model();
 
         float[][] input = new float[1][1];
         input[0][0] = (float)12.0;
@@ -74,7 +41,7 @@ public class MainActivity extends AppCompatActivity {
             FirebaseModelInputs inputs = new FirebaseModelInputs.Builder()
                     .add(input)  // add() as many input arrays as your model requires
                     .build();
-            firebaseInterpreter.run(inputs, inputOutputOptions)
+            firebaseModelInterpreter.run(inputs, IOOptions)
                     .addOnSuccessListener(
                             new OnSuccessListener<FirebaseModelOutputs>() {
                                 @Override
@@ -92,6 +59,39 @@ public class MainActivity extends AppCompatActivity {
                                     int i = 0;
                                     e.printStackTrace();
                                 }});
+        } catch (FirebaseMLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void set_up_firebase_model() {
+        FirebaseModelDownloadConditions.Builder conditionsBuilder =
+                new FirebaseModelDownloadConditions.Builder().requireWifi();
+        FirebaseModelDownloadConditions conditions = conditionsBuilder.build();
+
+        FirebaseRemoteModel cloudSource = new FirebaseRemoteModel.Builder("model-predictor")
+                .enableModelUpdates(true)
+                .setInitialDownloadConditions(conditions)
+                .setUpdatesDownloadConditions(conditions)
+                .build();
+        FirebaseModelManager.getInstance().registerRemoteModel(cloudSource);
+
+        FirebaseModelOptions options = new FirebaseModelOptions.Builder()
+                .setRemoteModelName("model-predictor")
+                .build();
+        firebaseModelInterpreter = null;
+        try {
+            firebaseModelInterpreter = FirebaseModelInterpreter.getInstance(options);
+        } catch (FirebaseMLException e) {
+            e.printStackTrace();
+        }
+        IOOptions = null;
+        try {
+            IOOptions =
+                    new FirebaseModelInputOutputOptions.Builder()
+                            .setInputFormat(0, FirebaseModelDataType.FLOAT32, new int[]{1, 1})
+                            .setOutputFormat(0, FirebaseModelDataType.FLOAT32, new int[]{1, 1})
+                            .build();
         } catch (FirebaseMLException e) {
             e.printStackTrace();
         }
