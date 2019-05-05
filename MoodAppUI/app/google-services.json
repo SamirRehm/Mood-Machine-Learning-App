@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "168111825608",
+    "firebase_url": "https://my-project-1520138558059.firebaseio.com",
+    "project_id": "my-project-1520138558059",
+    "storage_bucket": "my-project-1520138558059.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:168111825608:android:cb3988d9730f1153",
+        "android_client_info": {
+          "package_name": "com.example.srehm.moodappui"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "168111825608-r4rs8tc3i50tbmm979mtkd5fr13e4fss.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDUPw3lRpb5y-1rtgpTW9xGoWWJzQ5VNRY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "168111825608-r4rs8tc3i50tbmm979mtkd5fr13e4fss.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

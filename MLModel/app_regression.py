@@ -112,7 +112,6 @@ loss, mae, mse = model.evaluate(normed_test_data, test_labels, verbose=0)
 
 print("Testing set Mean Abs Error: {:5.2f} MPG".format(mae))
 
-
 test_predictions = model.predict(normed_test_data).flatten()
 
 plt.scatter(test_labels, test_predictions)
@@ -130,4 +129,10 @@ plt.hist(error, bins = 25)
 plt.xlabel("Prediction Error [MPG]")
 _ = plt.ylabel("Count")
 plt.show()
+
+model.save('app_model.h5')
+converter = tf.lite.TFLiteConverter.from_keras_model_file('app_model.h5')
+tflite_model = converter.convert()
+open("app_model.tflite", "wb").write(tflite_model)
+
 
