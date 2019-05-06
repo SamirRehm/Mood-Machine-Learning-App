@@ -1,5 +1,4 @@
 package com.example.srehm.moodappui;
-
 import android.content.Context;
 import android.content.Intent;
 import android.support.annotation.NonNull;
@@ -22,7 +21,6 @@ import java.io.FileOutputStream;
 import java.util.Calendar;
 
 public class MainActivity extends AppCompatActivity {
-
     FirebaseStorage storage;
     FirebaseModelInterpreter firebaseModelInterpreter;
     FirebaseModelInputOutputOptions IOOptions;
@@ -33,35 +31,6 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         storage = FirebaseStorage.getInstance();
         set_up_firebase_model();
-
-        float[][] input = new float[1][1];
-        input[0][0] = (float)12.0;
-
-        try {
-            FirebaseModelInputs inputs = new FirebaseModelInputs.Builder()
-                    .add(input)  // add() as many input arrays as your model requires
-                    .build();
-            firebaseModelInterpreter.run(inputs, IOOptions)
-                    .addOnSuccessListener(
-                            new OnSuccessListener<FirebaseModelOutputs>() {
-                                @Override
-                                public void onSuccess(FirebaseModelOutputs result) {
-                                    int i = 0;
-                                    float[][] output = result.getOutput(0);
-                                    float[] probabilities = output[0];
-                                    i=1;
-                                }
-                            })
-                    .addOnFailureListener(
-                            new OnFailureListener() {
-                                @Override
-                                public void onFailure(@NonNull Exception e) {
-                                    int i = 0;
-                                    e.printStackTrace();
-                                }});
-        } catch (FirebaseMLException e) {
-            e.printStackTrace();
-        }
     }
 
     public void set_up_firebase_model() {
@@ -97,6 +66,33 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    public void predict(float[][] input) {
+        input = new float[1][1];
+        input[0][0] = (float)12.0;
+        try {
+            FirebaseModelInputs inputs = new FirebaseModelInputs.Builder()
+                    .add(input)  // add() as many input arrays as your model requires
+                    .build();
+            firebaseModelInterpreter.run(inputs, IOOptions)
+                    .addOnSuccessListener(
+                            new OnSuccessListener<FirebaseModelOutputs>() {
+                                @Override
+                                public void onSuccess(FirebaseModelOutputs result) {
+                                    float[][] output = result.getOutput(0);
+                                    float[] probabilities = output[0];
+                                }
+                            })
+                    .addOnFailureListener(
+                            new OnFailureListener() {
+                                @Override
+                                public void onFailure(@NonNull Exception e) {
+                                    e.printStackTrace();
+                                }});
+        } catch (FirebaseMLException e) {
+            e.printStackTrace();
+        }
+    }
+
     public void save_data(View v) {
         String filename = "myfile";
         FileOutputStream outputStream;
@@ -118,6 +114,7 @@ public class MainActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
+    // weather api key: cb6a3e93bc1ef4e6f64672a923cd240a
     public void write_data(View v) {
         StorageReference root = storage.getReference();
         StorageReference mountainsRef = root.child("data.txt");
@@ -134,6 +131,5 @@ public class MainActivity extends AppCompatActivity {
                 // ...
             }
         });
-
     }
 }
