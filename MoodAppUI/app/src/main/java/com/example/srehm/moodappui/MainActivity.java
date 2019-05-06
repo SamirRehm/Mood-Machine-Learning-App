@@ -93,9 +93,25 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void save_data(View v) {
-        String filename = "myfile";
-        FileOutputStream outputStream;
+    public void add_data(View v) {
+        /*String filename = "myfile";
+        FileOutputStream outputStream;*/
+        StorageReference root = storage.getReference();
+        StorageReference fileRef = root.child("data.txt");
+
+        final long ONE_MEGABYTE = 1024 * 1024;
+        fileRef.getBytes(ONE_MEGABYTE).addOnSuccessListener(new OnSuccessListener<byte[]>() {
+            @Override
+            public void onSuccess(byte[] bytes) {
+                // Data for "images/island.jpg" is returns, use this as needed
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception exception) {
+                // Handle any errors
+            }
+        });
+
         RatingBar ratingBar = (RatingBar)findViewById(R.id.feeling);
         String mydate = java.text.DateFormat.getDateTimeInstance().format(Calendar.getInstance().getTime());
         try {
@@ -128,7 +144,6 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
                 // taskSnapshot.getMetadata() contains file metadata such as size, content-type, etc.
-                // ...
             }
         });
     }

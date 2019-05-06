@@ -40,7 +40,7 @@
                     android:layout_height="wrap_content"
                     android:background="@color/colorPrimary"
                     android:text="Add"
-                    android:onClick="save_data"
+                    android:onClick="add_data"
             />
         </LinearLayout>
         <Space android:layout_width="match_parent" android:layout_height="50dp"/>
