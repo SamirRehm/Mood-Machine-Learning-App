@@ -38,19 +38,18 @@ public class MainActivity extends AppCompatActivity {
     FirebaseModelInputOutputOptions IOOptions;
     ProgressDialog pd;
     String jsonResponse;
+    float prediction;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
         storage = FirebaseStorage.getInstance();
         set_up_firebase_model();
     }
 
     public void set_up_firebase_model() {
-        FirebaseModelDownloadConditions.Builder conditionsBuilder =
-                new FirebaseModelDownloadConditions.Builder().requireWifi();
+        FirebaseModelDownloadConditions.Builder conditionsBuilder = new FirebaseModelDownloadConditions.Builder().requireWifi();
         FirebaseModelDownloadConditions conditions = conditionsBuilder.build();
 
         FirebaseRemoteModel cloudSource = new FirebaseRemoteModel.Builder("model-predictor")
@@ -60,39 +59,32 @@ public class MainActivity extends AppCompatActivity {
                 .build();
         FirebaseModelManager.getInstance().registerRemoteModel(cloudSource);
 
-        FirebaseModelOptions options = new FirebaseModelOptions.Builder()
-                .setRemoteModelName("model-predictor")
-                .build();
+        FirebaseModelOptions options = new FirebaseModelOptions.Builder().setRemoteModelName("model-predictor").build();
         firebaseModelInterpreter = null;
-        try {
-            firebaseModelInterpreter = FirebaseModelInterpreter.getInstance(options);
-        } catch (FirebaseMLException e) {
-            e.printStackTrace();
-        }
         IOOptions = null;
         try {
-            IOOptions =
-                    new FirebaseModelInputOutputOptions.Builder()
-                            .setInputFormat(0, FirebaseModelDataType.FLOAT32, new int[]{1, 1})
-                            .setOutputFormat(0, FirebaseModelDataType.FLOAT32, new int[]{1, 1})
-                            .build();
+            firebaseModelInterpreter = FirebaseModelInterpreter.getInstance(options);
+            IOOptions = new FirebaseModelInputOutputOptions.Builder()
+                    .setInputFormat(0, FirebaseModelDataType.FLOAT32, new int[]{1, 1})
+                    .setOutputFormat(0, FirebaseModelDataType.FLOAT32, new int[]{1, 1})
+                    .build();
         } catch (FirebaseMLException e) {
             e.printStackTrace();
         }
     }
 
-    public float predict(float[][] input) {
-        FirebaseModelOutputs prediction = new FirebaseModelOutputs(new HashMap<Integer, Object>());
+    public void predict(float[][] input) {
         try {
             FirebaseModelInputs inputs = new FirebaseModelInputs.Builder()
                     .add(input)  // add() as many input arrays as your model requires
                     .build();
-            prediction = firebaseModelInterpreter.run(inputs, IOOptions)
+            firebaseModelInterpreter.run(inputs, IOOptions)
                     .addOnSuccessListener(
                             new OnSuccessListener<FirebaseModelOutputs>() {
                                 @Override
                                 public void onSuccess(FirebaseModelOutputs result) {
                                     float[][] output = result.getOutput(0);
+                                    prediction = output[0][0];
                                 }
                             })
                     .addOnFailureListener(
@@ -100,12 +92,58 @@ public class MainActivity extends AppCompatActivity {
                                 @Override
                                 public void onFailure(@NonNull Exception e) {
                                     e.printStackTrace();
-                                }}).getResult();
+                                }});
         } catch (FirebaseMLException e) {
             e.printStackTrace();
         }
-        float[][] output = prediction.getOutput(0);
-        return output[0][0];
+    }
+
+    private void upload(final float temperature) {
+        StorageReference root = storage.getReference();
+        final StorageReference fileRef = root.child("data.txt");
+
+        fileRef.getBytes(1024*1024).addOnSuccessListener(new OnSuccessListener<byte[]>() {
+            @Override
+            public void onSuccess(byte[] bytes) {
+                String res = new String(bytes);
+                RatingBar ratingBar = findViewById(R.id.feeling);
+                String newEntry = ratingBar.getRating() + "," + temperature + "\n";
+                res = res + newEntry;
+                UploadTask uploadTask = fileRef.putBytes(res.getBytes());
+                uploadTask.addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception exception) {
+                        //kkkk
+                    }
+                }).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
+                    @Override
+                    public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+                        final float[][] input = new float[1][1];
+                        input[0][0] = temperature;
+                        predict(input);
+                    }
+                });
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception exception) {
+                RatingBar ratingBar = findViewById(R.id.feeling);
+                String newEntry = ratingBar.getRating() + "," + temperature + "\n";
+                fileRef.putBytes(newEntry.getBytes()).addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception exception) {
+                        // Handle unsuccessful uploads
+                    }
+                }).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
+                    @Override
+                    public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+                        final float[][] input = new float[1][1];
+                        input[0][0] = temperature;
+                        predict(input);
+                    }
+                });
+            }
+        });
     }
 
     public void add_data(View v) throws ExecutionException, InterruptedException, JSONException {
@@ -116,43 +154,7 @@ public class MainActivity extends AppCompatActivity {
 
         float temperature = (float)reader.getJSONObject("main").getDouble("temp")-273.15f;
         long operationTime = System.currentTimeMillis() - startTime;
-        StorageReference root = storage.getReference();
-        final StorageReference fileRef = root.child("data.txt");
-
-        final long ONE_MEGABYTE = 1024 * 1024;
-        fileRef.getBytes(ONE_MEGABYTE).addOnSuccessListener(new OnSuccessListener<byte[]>() {
-            @Override
-            public void onSuccess(byte[] bytes) {
-                String res = new String(bytes);
-                RatingBar ratingBar = findViewById(R.id.feeling);
-                String mydate = java.text.DateFormat.getDateTimeInstance().format(Calendar.getInstance().getTime());
-                String newEntry = ratingBar.getRating() + "," + mydate + "\n";
-                res = res + newEntry;
-                UploadTask uploadTask = fileRef.putBytes(res.getBytes());
-                uploadTask.addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception exception) {
-                        // Handle unsuccessful uploads
-                    }
-                }).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
-                    @Override
-                    public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
-                        int i = 0;
-                    }
-                });
-            }
-        }).addOnFailureListener(new OnFailureListener() {
-            @Override
-            public void onFailure(@NonNull Exception exception) {
-                RatingBar ratingBar = findViewById(R.id.feeling);
-                String mydate = java.text.DateFormat.getDateTimeInstance().format(Calendar.getInstance().getTime());
-                String newEntry = ratingBar.getRating() + "," + mydate + "\n";
-                fileRef.putBytes(newEntry.getBytes());
-            }
-        });
-        final float[][] input = new float[1][1];
-        input[0][0] = temperature;
-        float prediction = predict(input);
+        upload(temperature);
     }
 
     public void feature_addition(View v) {
@@ -227,6 +229,4 @@ public class MainActivity extends AppCompatActivity {
             jsonResponse = result;
         }
     }
-
-    // weather api key: cb6a3e93bc1ef4e6f64672a923cd240a
 }
