@@ -1,14 +1,14 @@
 package com.example.srehm.moodappui;
+
 import android.app.ProgressDialog;
-import android.content.Context;
 import android.content.Intent;
 import android.os.AsyncTask;
+import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.MenuItem;
@@ -29,17 +29,16 @@ import com.google.firebase.storage.UploadTask;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.Calendar;
-import java.util.HashMap;
-import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 public class MainActivity extends AppCompatActivity {
-
 
     private String[] mNavigationDrawerItemTitles;
     private DrawerLayout mDrawerLayout;
@@ -79,7 +78,6 @@ public class MainActivity extends AppCompatActivity {
     private void selectItem(int position) {
 
         Fragment fragment = null;
-
         switch (position) {
             case 0:
                 fragment = connectFragment;
@@ -104,11 +102,9 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-
         if (mDrawerToggle.onOptionsItemSelected(item)) {
             return true;
         }
-
         return super.onOptionsItemSelected(item);
     }
 
@@ -137,7 +133,6 @@ public class MainActivity extends AppCompatActivity {
         mDrawerList = findViewById(R.id.left_drawer);
 
         setupToolbar();
-
         DataModel[] drawerItem = new DataModel[3];
 
         drawerItem[0] = new DataModel("Connect");
@@ -152,7 +147,6 @@ public class MainActivity extends AppCompatActivity {
         mDrawerLayout = (DrawerLayout) findViewById(R.id.drawer_layout);
         mDrawerLayout.setDrawerListener(mDrawerToggle);
         setupDrawerToggle();
-        mDrawerList.setSelection(0);
 
         connectFragment = new ConnectFragment();
         FragmentManager fragmentManager = getSupportFragmentManager();
@@ -195,7 +189,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void predict(float[][] input) {
+    private void predict(float[][] input) {
         try {
             FirebaseModelInputs inputs = new FirebaseModelInputs.Builder()
                     .add(input)  // add() as many input arrays as your model requires
@@ -207,6 +201,8 @@ public class MainActivity extends AppCompatActivity {
                                 public void onSuccess(FirebaseModelOutputs result) {
                                     float[][] output = result.getOutput(0);
                                     prediction = output[0][0];
+                                    pd.dismiss();
+                                    to_predictor_act();
                                 }
                             })
                     .addOnFailureListener(
@@ -221,10 +217,16 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void to_predictor_act() {
+        Intent intent = new Intent(this, Prediction_Activity.class);
+        startActivity(intent);
+    }
+
     private void upload(final float temperature) {
         StorageReference root = storage.getReference();
         final StorageReference fileRef = root.child("data.txt");
 
+        pd = ProgressDialog.show(this, "Please Wait", "");
         fileRef.getBytes(1024 * 1024).addOnSuccessListener(new OnSuccessListener<byte[]>() {
             @Override
             public void onSuccess(byte[] bytes) {
@@ -289,15 +291,13 @@ public class MainActivity extends AppCompatActivity {
 
         protected void onPreExecute() {
             super.onPreExecute();
-
-            pd = new ProgressDialog(MainActivity.this);
+            /*pd = new ProgressDialog(MainActivity.this);
             pd.setMessage("Please wait");
             pd.setCancelable(false);
-            pd.show();
+            pd.show();*/
         }
 
         protected String doInBackground(String... params) {
-
 
             HttpURLConnection connection = null;
             BufferedReader reader = null;
@@ -306,7 +306,6 @@ public class MainActivity extends AppCompatActivity {
                 URL url = new URL(params[0]);
                 connection = (HttpURLConnection) url.openConnection();
                 connection.connect();
-
 
                 InputStream stream = connection.getInputStream();
 
@@ -318,11 +317,8 @@ public class MainActivity extends AppCompatActivity {
                 while ((line = reader.readLine()) != null) {
                     buffer.append(line + "\n");
                     Log.d("Response: ", "> " + line);   //here u ll get whole response...... :-)
-
                 }
-
                 return buffer.toString();
-
 
             } catch (MalformedURLException e) {
                 e.printStackTrace();
@@ -346,9 +342,9 @@ public class MainActivity extends AppCompatActivity {
         @Override
         protected void onPostExecute(String result) {
             super.onPostExecute(result);
-            if (pd.isShowing()) {
+            /*if (pd.isShowing()) {
                 pd.dismiss();
-            }
+            }*/
             jsonResponse = result;
         }
     }
