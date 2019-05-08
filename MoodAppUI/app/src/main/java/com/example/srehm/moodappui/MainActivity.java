@@ -1,9 +1,13 @@
 package com.example.srehm.moodappui;
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
+import android.os.AsyncTask;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.View;
 import android.widget.RatingBar;
 import com.google.android.gms.tasks.OnFailureListener;
@@ -16,19 +20,30 @@ import com.google.firebase.ml.custom.*;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
+import org.json.JSONException;
+import org.json.JSONObject;
 
-import java.io.FileOutputStream;
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Calendar;
+import java.util.HashMap;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 public class MainActivity extends AppCompatActivity {
     FirebaseStorage storage;
     FirebaseModelInterpreter firebaseModelInterpreter;
     FirebaseModelInputOutputOptions IOOptions;
+    ProgressDialog pd;
+    String jsonResponse;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
         storage = FirebaseStorage.getInstance();
         set_up_firebase_model();
     }
@@ -66,20 +81,18 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void predict(float[][] input) {
-        input = new float[1][1];
-        input[0][0] = (float)12.0;
+    public float predict(float[][] input) {
+        FirebaseModelOutputs prediction = new FirebaseModelOutputs(new HashMap<Integer, Object>());
         try {
             FirebaseModelInputs inputs = new FirebaseModelInputs.Builder()
                     .add(input)  // add() as many input arrays as your model requires
                     .build();
-            firebaseModelInterpreter.run(inputs, IOOptions)
+            prediction = firebaseModelInterpreter.run(inputs, IOOptions)
                     .addOnSuccessListener(
                             new OnSuccessListener<FirebaseModelOutputs>() {
                                 @Override
                                 public void onSuccess(FirebaseModelOutputs result) {
                                     float[][] output = result.getOutput(0);
-                                    float[] probabilities = output[0];
                                 }
                             })
                     .addOnFailureListener(
@@ -87,42 +100,59 @@ public class MainActivity extends AppCompatActivity {
                                 @Override
                                 public void onFailure(@NonNull Exception e) {
                                     e.printStackTrace();
-                                }});
+                                }}).getResult();
         } catch (FirebaseMLException e) {
             e.printStackTrace();
         }
+        float[][] output = prediction.getOutput(0);
+        return output[0][0];
     }
 
-    public void add_data(View v) {
-        /*String filename = "myfile";
-        FileOutputStream outputStream;*/
+    public void add_data(View v) throws ExecutionException, InterruptedException, JSONException {
+
+        long startTime = System.currentTimeMillis();
+        String weather = new JsonTask().execute("http://api.openweathermap.org/data/2.5/weather?q=Chilliwack&APPID=cb6a3e93bc1ef4e6f64672a923cd240a").get();
+        JSONObject reader = new JSONObject(weather);
+
+        float temperature = (float)reader.getJSONObject("main").getDouble("temp")-273.15f;
+        long operationTime = System.currentTimeMillis() - startTime;
         StorageReference root = storage.getReference();
-        StorageReference fileRef = root.child("data.txt");
+        final StorageReference fileRef = root.child("data.txt");
 
         final long ONE_MEGABYTE = 1024 * 1024;
         fileRef.getBytes(ONE_MEGABYTE).addOnSuccessListener(new OnSuccessListener<byte[]>() {
             @Override
             public void onSuccess(byte[] bytes) {
-                // Data for "images/island.jpg" is returns, use this as needed
+                String res = new String(bytes);
+                RatingBar ratingBar = findViewById(R.id.feeling);
+                String mydate = java.text.DateFormat.getDateTimeInstance().format(Calendar.getInstance().getTime());
+                String newEntry = ratingBar.getRating() + "," + mydate + "\n";
+                res = res + newEntry;
+                UploadTask uploadTask = fileRef.putBytes(res.getBytes());
+                uploadTask.addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception exception) {
+                        // Handle unsuccessful uploads
+                    }
+                }).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
+                    @Override
+                    public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+                        int i = 0;
+                    }
+                });
             }
         }).addOnFailureListener(new OnFailureListener() {
             @Override
             public void onFailure(@NonNull Exception exception) {
-                // Handle any errors
+                RatingBar ratingBar = findViewById(R.id.feeling);
+                String mydate = java.text.DateFormat.getDateTimeInstance().format(Calendar.getInstance().getTime());
+                String newEntry = ratingBar.getRating() + "," + mydate + "\n";
+                fileRef.putBytes(newEntry.getBytes());
             }
         });
-
-        RatingBar ratingBar = (RatingBar)findViewById(R.id.feeling);
-        String mydate = java.text.DateFormat.getDateTimeInstance().format(Calendar.getInstance().getTime());
-        try {
-            outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
-            outputStream.write(String.valueOf(ratingBar.getRating()).getBytes());
-            outputStream.write(", ".getBytes());
-            outputStream.write(mydate.getBytes());
-            outputStream.close();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        final float[][] input = new float[1][1];
+        input[0][0] = temperature;
+        float prediction = predict(input);
     }
 
     public void feature_addition(View v) {
@@ -130,21 +160,73 @@ public class MainActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
-    // weather api key: cb6a3e93bc1ef4e6f64672a923cd240a
-    public void write_data(View v) {
-        StorageReference root = storage.getReference();
-        StorageReference mountainsRef = root.child("data.txt");
-        UploadTask uploadTask = mountainsRef.putBytes("aaa".getBytes());
-        uploadTask.addOnFailureListener(new OnFailureListener() {
-            @Override
-            public void onFailure(@NonNull Exception exception) {
-                // Handle unsuccessful uploads
+    private class JsonTask extends AsyncTask<String, String, String> {
+
+        protected void onPreExecute() {
+            super.onPreExecute();
+
+            pd = new ProgressDialog(MainActivity.this);
+            pd.setMessage("Please wait");
+            pd.setCancelable(false);
+            pd.show();
+        }
+
+        protected String doInBackground(String... params) {
+
+
+            HttpURLConnection connection = null;
+            BufferedReader reader = null;
+
+            try {
+                URL url = new URL(params[0]);
+                connection = (HttpURLConnection) url.openConnection();
+                connection.connect();
+
+
+                InputStream stream = connection.getInputStream();
+
+                reader = new BufferedReader(new InputStreamReader(stream));
+
+                StringBuffer buffer = new StringBuffer();
+                String line = "";
+
+                while ((line = reader.readLine()) != null) {
+                    buffer.append(line+"\n");
+                    Log.d("Response: ", "> " + line);   //here u ll get whole response...... :-)
+
+                }
+
+                return buffer.toString();
+
+
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                if (connection != null) {
+                    connection.disconnect();
+                }
+                try {
+                    if (reader != null) {
+                        reader.close();
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
-        }).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
-            @Override
-            public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
-                // taskSnapshot.getMetadata() contains file metadata such as size, content-type, etc.
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(String result) {
+            super.onPostExecute(result);
+            if (pd.isShowing()){
+                pd.dismiss();
             }
-        });
+            jsonResponse = result;
+        }
     }
+
+    // weather api key: cb6a3e93bc1ef4e6f64672a923cd240a
 }
