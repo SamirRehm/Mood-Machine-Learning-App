@@ -20,6 +20,8 @@
         </activity>
         <activity android:name=".feature_selection_activity">
         </activity>
+        <activity android:name=".Prediction_Activity">
+        </activity>
     </application>
 
 </manifest>
